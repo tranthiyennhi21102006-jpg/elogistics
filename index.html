@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Logistics ADMIN PORTAL - Quản Lý & Phân Bổ Đơn Hàng</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        .leaflet-container { font-family: 'Inter', sans-serif !important; background: #090d16 !important; }
+        .custom-div-icon { background: transparent; border: none; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 h-screen flex flex-col overflow-hidden select-none">
+
+    <!-- 1. MÀN HÌNH BẢO MẬT ĐĂNG NHẬP / THIẾT LẬP ADMIN -->
+    <div id="admin-auth-screen" class="fixed inset-0 z-50 bg-slate-950 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-5">
+            <div class="text-center space-y-2">
+                <div class="inline-flex bg-gradient-to-tr from-blue-600 to-indigo-500 text-white p-3.5 rounded-2xl text-2xl font-bold shadow-lg shadow-blue-500/30">
+                    <i class="fa-solid fa-user-shield"></i>
+                </div>
+                <h2 class="text-xl font-bold text-white">E-LOGISTICS ADMIN PORTAL</h2>
+                <p class="text-xs text-slate-400" id="auth-subtitle">Nhập mật khẩu quản trị viên để đăng nhập</p>
+            </div>
+
+            <form id="form-admin-login" onsubmit="handleAdminLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1.5">Tài khoản Quản trị</label>
+                    <input type="text" value="admin" readonly
+                        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-blue-400 font-semibold focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1.5">Mật khẩu xác thực</label>
+                    <input type="password" id="admin-pass-login" required placeholder="Nhập mật khẩu Admin của bạn" 
+                        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-all">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold py-3 rounded-xl transition-all shadow-lg shadow-blue-600/30">
+                    Xác Nhận Truy Cập Quản Trị
+                </button>
+            </form>
+
+            <form id="form-admin-setup" onsubmit="handleAdminSetup(event)" class="space-y-4 hidden">
+                <div class="bg-blue-500/10 border border-blue-500/20 p-3 rounded-xl text-xs text-blue-300 flex items-center gap-2">
+                    <i class="fa-solid fa-shield-halved text-base text-blue-400"></i>
+                    <span>Tạo <b>mật khẩu quản trị mới</b> để bảo mật hệ thống.</span>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1.5">Tạo Mật khẩu Admin mới</label>
+                    <input type="password" id="setup-pass" required placeholder="Nhập mật khẩu bạn muốn đặt" 
+                        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-all">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1.5">Xác nhận lại Mật khẩu</label>
+                    <input type="password" id="setup-pass-confirm" required placeholder="Nhập lại mật khẩu vừa đặt" 
+                        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-all">
+                </div>
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold py-3 rounded-xl transition-all shadow-lg shadow-emerald-600/30">
+                    Lưu Mật Khẩu & Truy Cập
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 2. GIAO DIỆN CHÍNH ADMIN DASHBOARD -->
+    <div id="admin-app" class="hidden h-screen flex flex-col">
+        <header class="bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between z-30 shrink-0">
+            <div class="flex items-center space-x-3">
+                <div class="bg-gradient-to-tr from-blue-600 to-indigo-500 text-white p-2 rounded-xl font-bold text-lg flex items-center justify-center w-10 h-10 shadow-lg shadow-blue-500/20">
+                    <i class="fa-solid fa-user-shield"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-base md:text-lg text-white leading-tight flex items-center gap-2">
+                        E-LOGISTICS ADMIN PORTAL <span class="bg-blue-500/20 text-blue-400 text-xs px-2 py-0.5 rounded border border-blue-500/30 font-semibold">Live GPS Tracker</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Hệ thống Tự động Đồng bộ Vị trí GPS Thực tế từ Shipper Cloud</p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-2 md:space-x-3">
+                <button id="btn-add-map-mode" onclick="toggleMapClickAddOrder()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs md:text-sm font-medium px-3 py-2 rounded-lg transition-all flex items-center">
+                    <i class="fa-solid fa-map-pin mr-1.5 text-rose-400"></i> <span id="map-add-status">Chạm bản đồ thêm đơn</span>
+                </button>
+                <button id="btn-vrp" onclick="runVRPOptimization()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs md:text-sm font-semibold px-3.5 py-2 rounded-lg transition-all flex items-center shadow-lg shadow-emerald-600/30">
+                    <i class="fa-solid fa-wand-magic-sparkles mr-2"></i> Tối ưu tuyến (VRP Real-Route)
+                </button>
+                <button onclick="exportReportCSV()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs md:text-sm font-medium px-3 py-2 rounded-lg transition-all flex items-center shadow-lg shadow-indigo-600/20">
+                    <i class="fa-solid fa-file-csv mr-1.5"></i> Xuất Báo Cáo
+                </button>
+                <button onclick="changeAdminPassword()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs md:text-sm font-medium px-3 py-2 rounded-lg border border-slate-700 transition-all" title="Đổi mật khẩu">
+                    <i class="fa-solid fa-key mr-1"></i> Đổi MK
+                </button>
+                <button onclick="handleAdminLogout()" class="bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30 text-xs md:text-sm font-medium px-3 py-2 rounded-lg transition-all flex items-center">
+                    <i class="fa-solid fa-right-from-bracket mr-1.5"></i> Đăng xuất
+                </button>
+            </div>
+        </header>
+
+        <div class="flex-1 flex overflow-hidden relative">
+            <aside class="w-80 md:w-96 bg-slate-900 border-r border-slate-800 flex flex-col shrink-0 z-20">
+                <div class="flex border-b border-slate-800 bg-slate-950/50">
+                    <button onclick="switchTab('shippers')" id="tab-shippers" class="flex-1 py-2.5 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 flex items-center justify-center gap-1.5 transition-all">
+                        <i class="fa-solid fa-users-gear"></i> Đội xe Live (<span id="cnt-shippers">0</span>)
+                    </button>
+                    <button onclick="switchTab('orders')" id="tab-orders" class="flex-1 py-2.5 text-xs font-semibold text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1.5 transition-all">
+                        <i class="fa-solid fa-box"></i> Phân bổ đơn (<span id="cnt-orders">0</span>)
+                    </button>
+                    <button onclick="switchTab('telematics')" id="tab-telematics" class="flex-1 py-2.5 text-xs font-semibold text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1.5 relative">
+                        <i class="fa-solid fa-shield-halved"></i> Telematics Risk
+                        <span id="risk-badge" class="hidden bg-rose-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold ml-1">0</span>
+                    </button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-3 space-y-3">
+                    <div id="panel-shippers" class="space-y-2.5">
+                        <div class="flex items-center justify-between text-xs text-slate-400 px-1">
+                            <span>Vị trí GPS Real-time & Trạng thái</span>
+                            <span id="cloud-sync-badge" class="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded font-mono">● Cloud Live</span>
+                        </div>
+                        <div id="shippers-list" class="space-y-2"></div>
+                    </div>
+
+                    <div id="panel-orders" class="space-y-2.5 hidden">
+                        <div class="flex items-center justify-between text-xs text-slate-400 px-1">
+                            <span>Quản lý Đơn hàng & Gán cho Shipper Online</span>
+                            <button onclick="addRandomOrder()" class="text-blue-400 hover:text-blue-300 font-medium text-xs">+ Thêm đơn ngẫu nhiên</button>
+                        </div>
+                        <div id="orders-list" class="space-y-2"></div>
+                    </div>
+
+                    <div id="panel-telematics" class="space-y-2.5 hidden">
+                        <div class="bg-slate-950/80 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-300">
+                            <div class="font-semibold text-slate-200 mb-1 flex items-center gap-1.5">
+                                <i class="fa-solid fa-microchip text-blue-400"></i> Cảm biến Viễn thông Telematics
+                            </div>
+                            <p class="text-[11px] text-slate-400 leading-relaxed">Giám sát tốc độ, phanh gấp và nhiệt độ thùng xe.</p>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="triggerRiskEvent('braking')" class="bg-slate-800 hover:bg-slate-700 border border-amber-500/30 text-amber-400 text-xs p-2 rounded-lg text-left">
+                                <i class="fa-solid fa-triangle-exclamation mr-1"></i> Phanh Gấp
+                            </button>
+                            <button onclick="triggerRiskEvent('speed')" class="bg-slate-800 hover:bg-slate-700 border border-rose-500/30 text-rose-400 text-xs p-2 rounded-lg text-left">
+                                <i class="fa-solid fa-gauge-high mr-1"></i> Quá Tốc Độ
+                            </button>
+                        </div>
+                        <div class="text-xs text-slate-400 px-1 pt-2">Lịch sử sự kiện Telematics</div>
+                        <div id="telematics-logs" class="space-y-2 max-h-80 overflow-y-auto">
+                            <div class="text-center py-6 text-slate-500 text-xs italic">Chưa có sự kiện rủi ro.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-3 bg-slate-950 border-t border-slate-800 shrink-0 space-y-2">
+                    <div class="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                        <span><i class="fa-solid fa-chart-line text-emerald-400 mr-1"></i> Thống kê Vận hành</span>
+                        <span id="kpi-status" class="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">Chưa tối ưu</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div class="bg-slate-900 border border-slate-800 p-2 rounded-lg">
+                            <div class="text-slate-400 text-[10px]">Quãng đường</div>
+                            <div class="text-emerald-400 font-bold text-sm" id="kpi-distance">0.0 km</div>
+                        </div>
+                        <div class="bg-slate-900 border border-slate-800 p-2 rounded-lg">
+                            <div class="text-slate-400 text-[10px]">Tiết kiệm nhiên liệu</div>
+                            <div class="text-blue-400 font-bold text-sm" id="kpi-fuel">0 %</div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="flex-1 flex flex-col relative bg-slate-950">
+                <div id="map" class="w-full flex-1 z-10"></div>
+                <div class="h-44 bg-slate-900 border-t border-slate-800 flex flex-col z-20 shrink-0">
+                    <div class="px-3 py-1.5 bg-slate-950 border-b border-slate-800 text-xs font-bold text-slate-200">
+                        <i class="fa-solid fa-clock-rotate-left text-blue-400 mr-1"></i> BẢNG ĐIỀU PHỐI LỊCH TRÌNH SHIELDER / GANTT
+                    </div>
+                    <div id="timeline-container" class="flex-1 overflow-x-auto overflow-y-auto p-2 space-y-2">
+                        <div class="text-center py-8 text-slate-500 text-xs">Bấm "Tối ưu tuyến" để tạo lịch trình.</div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modal Dialog -->
+    <div id="custom-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-5 shadow-2xl space-y-4">
+            <h3 id="modal-title" class="font-bold text-slate-100 text-base">Thông báo Admin</h3>
+            <p id="modal-message" class="text-xs text-slate-300 leading-relaxed">Nội dung...</p>
+            <div class="flex justify-end"><button onclick="closeModal()" class="bg-blue-600 text-white text-xs font-semibold px-4 py-2 rounded-lg">Xác nhận</button></div>
+        </div>
+    </div>
+
+   <script>
+        // Sử dụng KVDB Cloud miễn phí, không giới hạn CORS, không cần đăng ký
+        // Cùng Bucket KVdb với trang Shipper; mỗi shipper có key riêng.
+        const KVDB_BUCKET = "https://kvdb.io/Drx9G5y2m8K4pL9vQ1wZ7x";
+        const LEGACY_CLOUD_URL = KVDB_BUCKET + "/elogistics_data";
+        const REGISTER_PREFIX = "shipper_registered_";
+        const ONLINE_PREFIX = "shipper_online_";
+        const DEPOT = { lat: 10.7769, lng: 106.7009, name: "Kho Tổng Chặng Cuối (Quận 1, TP.HCM)" };
+        let map, activeTab = 'shippers', isAddOrderOnMapMode = false;
+        let routePolylines = [], markersOnMap = [], shippers = [];
+        let isDashboardActive = false;
+        let cloudRefreshTimer = null;
+        let legacyCloudLoaded = false;
+        let legacyRegisteredCache = {};
+        let legacyOnlineCache = {};
+
+        let orders = [
+            { id: 'ORD-101', name: 'Chợ Bến Thành (Quận 1)', lat: 10.7721, lng: 106.6983, weight: 12, isCold: false, status: 'Pending', assignedShipper: null },
+            { id: 'ORD-102', name: 'Siêu thị Điện Biên Phủ (Q3)', lat: 10.7872, lng: 106.6912, weight: 18, isCold: true, status: 'Pending', assignedShipper: null },
+            { id: 'ORD-103', name: 'Landmark 81 (Bình Thạnh)', lat: 10.7950, lng: 106.7218, weight: 25, isCold: false, status: 'Pending', assignedShipper: null }
+        ];
+
+        window.onload = function() { checkAdminPasswordState(); };
+
+        function checkAdminPasswordState() {
+            const savedPassword = localStorage.getItem('admin_master_password');
+            if (!savedPassword) {
+                document.getElementById('form-admin-login').classList.add('hidden');
+                document.getElementById('form-admin-setup').classList.remove('hidden');
+            } else {
+                document.getElementById('form-admin-login').classList.remove('hidden');
+                document.getElementById('form-admin-setup').classList.add('hidden');
+            }
+        }
+
+        function handleAdminSetup(e) {
+            e.preventDefault();
+            const pass1 = document.getElementById('setup-pass').value.trim();
+            const pass2 = document.getElementById('setup-pass-confirm').value.trim();
+            if (pass1.length < 4 || pass1 !== pass2) { alert('Mật khẩu không khớp hoặc quá ngắn!'); return; }
+            localStorage.setItem('admin_master_password', pass1);
+            enterAdminDashboard();
+        }
+
+        function handleAdminLogin(e) {
+            e.preventDefault();
+            const inputPass = document.getElementById('admin-pass-login').value.trim();
+            if (inputPass === localStorage.getItem('admin_master_password')) {
+                enterAdminDashboard();
+            } else { alert('Mật khẩu Admin không đúng!'); }
+        }
+
+        function enterAdminDashboard() {
+            document.getElementById('admin-auth-screen').classList.add('hidden');
+            document.getElementById('admin-app').classList.remove('hidden');
+            isDashboardActive = true;
+
+            setTimeout(() => {
+                initMap();
+                fetchCloudData();
+                renderOrdersList();
+                if (!cloudRefreshTimer) cloudRefreshTimer = setInterval(fetchCloudData, 10000);
+            }, 100);
+        }
+
+        function changeAdminPassword() {
+            const currentPass = prompt("Nhập mật khẩu Admin HIỆN TẠI:");
+            if (currentPass === localStorage.getItem('admin_master_password')) {
+                const newPass = prompt("Nhập mật khẩu MỚI bạn muốn đổi:");
+                if (newPass && newPass.trim().length >= 4) {
+                    localStorage.setItem('admin_master_password', newPass.trim());
+                    alert("Đã đổi mật khẩu Admin thành công!");
+                }
+            } else { alert("Mật khẩu không đúng!"); }
+        }
+
+        function handleAdminLogout() { isDashboardActive = false; if (cloudRefreshTimer) clearInterval(cloudRefreshTimer); location.reload(); }
+
+        async function readKVDBPrefix(prefix) {
+            const url = `${KVDB_BUCKET}/?prefix=${encodeURIComponent(prefix)}&values=true&format=json&t=${Date.now()}`;
+            const res = await fetch(url, { cache: "no-store" });
+            if (!res.ok) throw new Error(`KVdb HTTP ${res.status}`);
+            const rows = await res.json();
+            const result = {};
+            if (Array.isArray(rows)) rows.forEach(row => {
+                if (!Array.isArray(row) || row.length < 2) return;
+                const key = String(row[0]);
+                let value = row[1];
+                if (typeof value === "string") { try { value = JSON.parse(value); } catch (_) {} }
+                result[key.slice(prefix.length)] = value;
+            });
+            return result;
+        }
+
+        async function fetchCloudData() {
+            if (!isDashboardActive) return;
+            try {
+                const [registeredObj, onlineObj] = await Promise.all([
+                    readKVDBPrefix(REGISTER_PREFIX),
+                    readKVDBPrefix(ONLINE_PREFIX)
+                ]);
+                // Nạp dữ liệu phiên bản cũ đúng một lần, tránh gọi API liên tục.
+                if (!legacyCloudLoaded) {
+                    try {
+                        const legacyRes = await fetch(LEGACY_CLOUD_URL + "?t=" + Date.now(), { cache: "no-store" });
+                        if (legacyRes.ok) {
+                            const raw = await legacyRes.text();
+                            const legacy = raw ? JSON.parse(raw) : {};
+                            legacyRegisteredCache = legacy.registered_shippers || {};
+                            legacyOnlineCache = legacy.online_shippers || {};
+                        }
+                    } catch (_) {}
+                    legacyCloudLoaded = true;
+                }
+                Object.entries(legacyRegisteredCache).forEach(([u, v]) => { if (!registeredObj[u]) registeredObj[u] = v; });
+                Object.entries(legacyOnlineCache).forEach(([u, v]) => { if (!onlineObj[u]) onlineObj[u] = v; });
+
+                const now = Date.now();
+                const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4'];
+                const allUsernames = Array.from(new Set([...Object.keys(registeredObj), ...Object.keys(onlineObj)]));
+                shippers = allUsernames.map((u, idx) => {
+                    const sp = registeredObj[u] || { fullname: u.toUpperCase(), phone: 'Chưa cập nhật', vehicle: 'Xe Máy' };
+                    const statusInfo = onlineObj[u];
+                    const isFresh = statusInfo && statusInfo.lastUpdate && (now - Number(statusInfo.lastUpdate) < 20000);
+                    const isOnline = Boolean(statusInfo && statusInfo.isOnline && isFresh);
+                    const lat = Number.isFinite(Number(statusInfo?.lat)) ? Number(statusInfo.lat) : DEPOT.lat;
+                    const lng = Number.isFinite(Number(statusInfo?.lng)) ? Number(statusInfo.lng) : DEPOT.lng;
+                    return {
+                        id: u.toUpperCase(), name: sp.fullname || u,
+                        phone: sp.phone || 'Chưa cập nhật', vehicle: sp.vehicle || 'Xe Máy',
+                        color: colors[idx % colors.length], lat, lng, isOnline, route: []
+                    };
+                });
+
+                const badge = document.getElementById('cloud-sync-badge');
+                badge.innerText = "● Cloud Live";
+                badge.className = "text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded font-mono";
+                document.getElementById('cnt-shippers').innerText = shippers.length;
+                renderShippersList(); renderOrdersList();
+                if (map) renderMapMarkers();
+            } catch (err) {
+                const badge = document.getElementById('cloud-sync-badge');
+                badge.innerText = "○ Mất kết nối Cloud";
+                badge.className = "text-[10px] bg-rose-500/10 text-rose-400 border border-rose-500/20 px-1.5 py-0.5 rounded font-mono";
+                console.error("Không thể đồng bộ shipper:", err);
+            }
+        }
+
+        function initMap() {
+            if (map) return;
+            map = L.map('map', { zoomControl: false }).setView([DEPOT.lat, DEPOT.lng], 13);
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, TomTom, 2012', maxZoom: 18
+            }).addTo(map);
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+            map.on('click', function(e) { if (isAddOrderOnMapMode) addOrderAtLatLng(e.latlng.lat, e.latlng.lng); });
+            renderMapMarkers();
+        }
+
+        function renderMapMarkers() {
+            markersOnMap.forEach(m => map.removeLayer(m));
+            markersOnMap = [];
+
+            const depotIcon = L.divIcon({
+                className: 'custom-div-icon',
+                html: `<div class="w-8 h-8 rounded-full bg-amber-500 border-2 border-white text-slate-950 flex items-center justify-center font-bold text-sm shadow-xl"><i class="fa-solid fa-warehouse"></i></div>`,
+                iconSize: [32, 32], iconAnchor: [16, 16]
+            });
+            markersOnMap.push(L.marker([DEPOT.lat, DEPOT.lng], { icon: depotIcon }).addTo(map));
+
+            orders.forEach((ord) => {
+                let bgColor = ord.status === 'Completed' ? 'bg-emerald-500' : (ord.assignedShipper ? 'bg-blue-500' : 'bg-rose-500');
+                const orderIcon = L.divIcon({
+                    className: 'custom-div-icon',
+                    html: `<div class="w-7 h-7 rounded-full ${bgColor} border-2 border-slate-900 text-white flex items-center justify-center text-xs font-bold shadow-lg"><i class="fa-solid fa-box"></i></div>`,
+                    iconSize: [28, 28], iconAnchor: [14, 14]
+                });
+                markersOnMap.push(L.marker([ord.lat, ord.lng], { icon: orderIcon }).addTo(map).bindPopup(`<b>${ord.name}</b><br>Mã đơn: ${ord.id}`));
+            });
+
+            shippers.filter(sp => sp.isOnline).forEach(sp => {
+                const spIcon = L.divIcon({
+                    className: 'custom-div-icon',
+                    html: `<div class="w-9 h-9 rounded-full border-2 border-white flex items-center justify-center text-white text-sm font-bold shadow-2xl animate-pulse" style="background-color: ${sp.color}"><i class="fa-solid fa-motorcycle"></i></div>`,
+                    iconSize: [36, 36], iconAnchor: [18, 18]
+                });
+                markersOnMap.push(L.marker([sp.lat, sp.lng], { icon: spIcon }).addTo(map).bindPopup(`<b>Shipper Online: ${sp.name}</b> (${sp.id})`));
+            });
+        }
+
+        async function runVRPOptimization() {
+            const onlineShippers = shippers.filter(s => s.isOnline);
+            if (onlineShippers.length === 0) {
+                showModal("Không có Shipper Online", "Hiện tại không có tài xế nào bật ứng dụng và bật GPS. Vui lòng đợi Shipper đăng nhập!");
+                return;
+            }
+            routePolylines.forEach(p => map.removeLayer(p));
+            routePolylines = [];
+            shippers.forEach(sp => { sp.route = []; });
+            orders.forEach((ord, idx) => {
+                let sp = onlineShippers[idx % onlineShippers.length];
+                if(sp) { ord.assignedShipper = sp.id; sp.route.push(ord); }
+            });
+            for(let sp of onlineShippers) {
+                if(sp.route.length === 0) continue;
+                let coords = [[sp.lat, sp.lng]];
+                sp.route.forEach(o => coords.push([o.lat, o.lng]));
+                let polyline = L.polyline(coords, { color: sp.color, weight: 5, opacity: 0.85 }).addTo(map);
+                routePolylines.push(polyline);
+            }
+            renderMapMarkers(); renderOrdersList(); renderTimelineGantt();
+            showModal("Tối ưu VRP thành công!", `Đã phân bổ tuyến đường cho ${onlineShippers.length} tài xế đang Online dựa trên vị trí GPS.`);
+        }
+
+        function assignOrderToShipper(orderId, shipperId) {
+            let ord = orders.find(o => o.id === orderId);
+            if (ord) { ord.assignedShipper = shipperId || null; renderMapMarkers(); }
+        }
+
+        function renderShippersList() {
+            const container = document.getElementById('shippers-list');
+            container.innerHTML = '';
+            shippers.forEach(sp => {
+                const card = document.createElement('div');
+                card.className = "bg-slate-950 border border-slate-800 p-2.5 rounded-xl text-xs space-y-1.5";
+                const statusBadge = sp.isOnline 
+                    ? `<span class="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.2 rounded font-semibold animate-pulse">● GPS Online</span>`
+                    : `<span class="text-[10px] bg-slate-800 text-slate-500 px-1.5 py-0.2 rounded">○ Offline (Đã tắt ca)</span>`;
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${sp.isOnline ? sp.color : '#64748b'}"></span>
+                            <span class="font-bold text-slate-200">${sp.name}</span>
+                            <span class="text-[10px] bg-slate-800 text-slate-400 px-1 rounded">${sp.id}</span>
+                        </div>
+                        ${statusBadge}
+                    </div>
+                    <div class="text-[11px] text-slate-400 flex justify-between">
+                        <span><i class="fa-solid fa-phone mr-1"></i>${sp.phone}</span>
+                        <span><i class="fa-solid fa-location-crosshairs mr-1 ${sp.isOnline ? 'text-emerald-400' : 'text-slate-600'}"></i>${sp.isOnline ? `${sp.lat.toFixed(4)}, ${sp.lng.toFixed(4)}` : 'N/A'}</span>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function renderOrdersList() {
+            const container = document.getElementById('orders-list');
+            container.innerHTML = '';
+            orders.forEach(ord => {
+                const card = document.createElement('div');
+                card.className = "bg-slate-950 border border-slate-800 p-2.5 rounded-xl space-y-1.5 text-xs";
+                let shipperOpts = `<option value="">-- Tự động phân bổ (VRP) --</option>`;
+                shippers.forEach(sp => {
+                    if (sp.isOnline) {
+                        shipperOpts += `<option value="${sp.id}" ${ord.assignedShipper === sp.id ? 'selected' : ''}>${sp.id} - ${sp.name} (Online)</option>`;
+                    } else {
+                        shipperOpts += `<option value="${sp.id}" disabled class="text-slate-600">${sp.id} - ${sp.name} (Offline)</option>`;
+                    }
+                });
+                card.innerHTML = `
+                    <div class="flex justify-between font-bold text-slate-200"><span>${ord.name}</span></div>
+                    <div class="flex justify-between text-[11px] text-slate-400"><span>Mã: ${ord.id} - Khối lượng: ${ord.weight}kg</span></div>
+                    <div class="pt-1 flex items-center gap-2">
+                        <span class="text-[10px] text-slate-400 shrink-0">Phân công:</span>
+                        <select onchange="assignOrderToShipper('${ord.id}', this.value)" class="bg-slate-900 border border-slate-700 text-slate-200 text-[11px] rounded p-1 flex-1">${shipperOpts}</select>
+                    </div>`;
+                container.appendChild(card);
+            });
+            document.getElementById('cnt-orders').innerText = orders.length;
+        }
+
+        function renderTimelineGantt() {
+            const container = document.getElementById('timeline-container');
+            container.innerHTML = '';
+            shippers.filter(sp => sp.isOnline).forEach(sp => {
+                const row = document.createElement('div');
+                row.className = "flex items-center space-x-2 text-xs bg-slate-950 p-2 rounded border border-slate-800";
+                row.innerHTML = `<span class="font-bold text-slate-200 w-32">${sp.name} (${sp.id}):</span> <span class="text-slate-400">${sp.route.length} đơn hàng được phân công</span>`;
+                container.appendChild(row);
+            });
+        }
+
+        function switchTab(tab) {
+            document.getElementById('panel-shippers').classList.add('hidden');
+            document.getElementById('panel-orders').classList.add('hidden');
+            document.getElementById('panel-telematics').classList.add('hidden');
+            document.getElementById(`panel-${tab}`).classList.remove('hidden');
+        }
+
+        function toggleMapClickAddOrder() { isAddOrderOnMapMode = !isAddOrderOnMapMode; }
+        function addOrderAtLatLng(lat, lng) {
+            const newId = `ORD-${100 + orders.length + 1}`;
+            orders.push({ id: newId, name: `Đơn vị trí mới (${newId})`, lat: lat, lng: lng, weight: 10, isCold: false, status: 'Pending', assignedShipper: null });
+            renderMapMarkers(); renderOrdersList();
+        }
+        function addRandomOrder() { addOrderAtLatLng(DEPOT.lat + (Math.random()-0.5)*0.05, DEPOT.lng + (Math.random()-0.5)*0.05); }
+        function exportReportCSV() { alert("Đã xuất tệp CSV báo cáo dữ liệu Admin."); }
+        function triggerRiskEvent(t) { alert("Cảnh báo sự kiện Telematics rủi ro: " + t); }
+        function showModal(title, msg) { document.getElementById('modal-title').innerText = title; document.getElementById('modal-message').innerText = msg; document.getElementById('custom-modal').classList.remove('hidden'); }
+        function closeModal() { document.getElementById('custom-modal').classList.add('hidden'); }
+    </script>
+</body>
+</html>

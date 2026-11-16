@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Logistics SHIPPER APP - Nhật Ký Lộ Trình & Telematics GPS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        .leaflet-container { font-family: 'Inter', sans-serif !important; background: #090d16 !important; }
+        .custom-div-icon { background: transparent; border: none; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 h-screen flex flex-col overflow-hidden select-none">
+
+    <!-- 1. MÀN HÌNH ĐĂNG NHẬP / ĐĂNG KÝ SHIPPER -->
+    <div id="shipper-auth-screen" class="fixed inset-0 z-50 bg-slate-950 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <div class="text-center space-y-2">
+                <div class="inline-flex bg-gradient-to-tr from-emerald-600 to-teal-500 text-white p-3 rounded-2xl text-2xl font-bold shadow-lg shadow-emerald-500/30">
+                    <i class="fa-solid fa-motorcycle"></i>
+                </div>
+                <h2 class="text-xl font-bold text-white">LOGISTICK SHIPPER APP</h2>
+                <p class="text-xs text-slate-400" id="auth-subtitle">Đăng nhập để bật GPS và nhận tuyến giao hàng</p>
+            </div>
+
+            <div class="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+                <button type="button" onclick="switchAuthMode('login')" id="btn-tab-login" class="flex-1 py-2 text-xs font-semibold rounded-lg bg-emerald-600 text-white transition-all shadow">
+                    Đăng Nhập
+                </button>
+                <button type="button" onclick="switchAuthMode('register')" id="btn-tab-register" class="flex-1 py-2 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all">
+                    Đăng Ký Mới
+                </button>
+            </div>
+
+            <!-- FORM ĐĂNG NHẬP -->
+            <form id="form-login" onsubmit="handleShipperLogin(event)" class="space-y-3.5">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Mã Tài khoản / Tên đăng nhập</label>
+                    <input type="text" id="login-username" required placeholder="Nhập tên đăng nhập" 
+                        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-all">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Mật khẩu</label>
+                    <input type="password" id="login-password" required placeholder="••••••••" 
+                        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-all">
+                </div>
+                <button type="submit" id="btn-submit-login" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold py-3 rounded-xl transition-all shadow-lg shadow-emerald-600/30">
+                    <i class="fa-solid fa-location-crosshairs mr-1.5"></i> Đăng Nhập & Bật Định Vị GPS
+                </button>
+            </form>
+
+            <!-- FORM ĐĂNG KÝ -->
+            <form id="form-register" onsubmit="handleShipperRegister(event)" class="space-y-3 hidden">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Họ và Tên Tài xế</label>
+                    <input type="text" id="reg-fullname" required placeholder="Ví dụ: Nguyễn Văn Bình" 
+                        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-all">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Tên đăng nhập (Username)</label>
+                    <input type="text" id="reg-username" required placeholder="Viết liền không dấu (VD: shipper2)" 
+                        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-all">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Số điện thoại liên hệ</label>
+                    <input type="tel" id="reg-phone" required placeholder="Ví dụ: 0909123456" 
+                        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-all">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Phương tiện vận chuyển</label>
+                    <select id="reg-vehicle" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 transition-all">
+                        <option value="Xe Máy (Honda Wave)">Xe Máy (Xăng)</option>
+                        <option value="Xe Máy Điện (VinFast)">Xe Máy Điện (Thùng lạnh)</option>
+                        <option value="Xe Tải Nhỏ (1.2 Tấn)">Xe Tải Nhỏ (1.2 Tấn)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Mật khẩu đăng nhập</label>
+                    <input type="password" id="reg-password" required minlength="3" placeholder="Tối thiểu 3 ký tự" 
+                        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-all">
+                </div>
+                <button type="submit" id="btn-submit-register" class="w-full bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold py-3 rounded-xl transition-all shadow-lg shadow-blue-600/30 mt-2">
+                    Xác Nhận Đăng Ký Tài Khoản
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 2. GIAO DIỆN CHÍNH SHIPPER -->
+    <div id="shipper-app" class="hidden h-screen flex flex-col">
+        <header class="bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between z-30 shrink-0">
+            <div class="flex items-center space-x-3">
+                <div class="bg-gradient-to-tr from-emerald-600 to-teal-500 text-white p-2 rounded-xl font-bold text-lg flex items-center justify-center w-10 h-10 shadow-lg shadow-emerald-500/20">
+                    <i class="fa-solid fa-motorcycle"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-base md:text-lg text-white leading-tight flex items-center gap-2">
+                        LOGISTICK SHIPPER APP <span id="gps-status-badge" class="bg-emerald-500/20 text-emerald-400 text-xs px-2 py-0.5 rounded border border-emerald-500/30 font-semibold animate-pulse">● GPS Online</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Đang phát sóng tọa độ vị trí thực tế cho Kho Tổng Cloud</p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-2">
+                <button onclick="handleShipperLogout()" class="bg-rose-600 hover:bg-rose-500 text-white text-xs md:text-sm font-semibold px-3.5 py-2 rounded-lg transition-all flex items-center shadow-lg shadow-rose-600/30">
+                    <i class="fa-solid fa-power-off mr-1.5"></i> Tắt Ca (Out Account)
+                </button>
+            </div>
+        </header>
+
+        <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+            <aside class="w-full md:w-96 bg-slate-900 border-r border-slate-800 flex flex-col shrink-0 z-20 h-1/2 md:h-full">
+                <div class="flex border-b border-slate-800 bg-slate-950/50">
+                    <button onclick="switchTab('my-route')" id="tab-route" class="flex-1 py-2.5 text-xs font-semibold text-emerald-400 border-b-2 border-emerald-500 flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-route"></i> Tuyến Giao Hàng
+                    </button>
+                    <button onclick="switchTab('telematics')" id="tab-telematics" class="flex-1 py-2.5 text-xs font-semibold text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-shield-halved"></i> Cảnh Báo An Toàn
+                    </button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-3 space-y-3">
+                    <div id="panel-route" class="space-y-2.5">
+                        <div class="bg-slate-950 border border-slate-800 p-3 rounded-xl">
+                            <div class="text-xs text-slate-400">Tài xế đang làm việc:</div>
+                            <div class="font-bold text-emerald-400 text-sm mt-0.5" id="shipper-name-display">...</div>
+                            <div class="text-[11px] text-slate-400 mt-1" id="shipper-vehicle-display">Phương tiện: ...</div>
+                            <div class="text-[10px] text-slate-500 mt-1 flex items-center gap-1" id="gps-coords-display">
+                                <i class="fa-solid fa-crosshairs text-emerald-400"></i> Tọa độ GPS: Đang quét...
+                            </div>
+                        </div>
+
+                        <div class="text-xs text-slate-400 px-1 pt-1">Danh sách điểm giao trong ca:</div>
+                        <div id="shipper-task-list" class="space-y-2"></div>
+                    </div>
+
+                    <div id="panel-telematics" class="space-y-2.5 hidden">
+                        <div class="bg-slate-950/80 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-300">
+                            <div class="font-semibold text-slate-200 mb-1 flex items-center gap-1.5">
+                                <i class="fa-solid fa-gauge-high text-emerald-400"></i> Cảm biến Giám sát Lái xe
+                            </div>
+                            <p class="text-[11px] text-slate-400">Hệ thống tự động cảnh báo thời gian thực khi vi phạm tốc độ hoặc phanh gấp.</p>
+                        </div>
+                        <div class="bg-slate-950 border border-slate-800 p-3 rounded-xl space-y-2 text-xs">
+                            <div class="flex justify-between"><span>Vận tốc GPS:</span><b id="gps-speed-display" class="text-emerald-400">0 km/h</b></div>
+                            <div class="flex justify-between"><span>Trạng thái phanh:</span><b class="text-slate-300">An toàn</b></div>
+                            <div class="flex justify-between"><span>Nhiệt độ thùng lạnh:</span><b class="text-cyan-400">4.2°C</b></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-3 bg-slate-950 border-t border-slate-800 text-xs text-slate-400 text-center shrink-0">
+                    E-Logistics Shipper Mode v3.8 (KVDB Cloud Sync)
+                </div>
+            </aside>
+
+            <main class="flex-1 relative bg-slate-950 h-1/2 md:h-full">
+                <div id="map" class="w-full h-full z-10"></div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // Khớp 100% đường dẫn KVDB Cloud với file index.html của Admin
+        // Phải trùng Bucket với trang Admin. Mỗi tài khoản ghi vào key riêng.
+        const KVDB_BUCKET = "https://kvdb.io/Drx9G5y2m8K4pL9vQ1wZ7x";
+        const REGISTER_PREFIX = "shipper_registered_";
+        const ONLINE_PREFIX = "shipper_online_";
+        const DEPOT = { lat: 10.7769, lng: 106.7009, name: "Kho Tổng Chặng Cuối" };
+        let map, userMarker = null, watchGpsId = null, heartbeatTimer = null;
+        let currentUsername = null, currentLat = DEPOT.lat, currentLng = DEPOT.lng;
+
+        let tasks = [
+            { id: 'ORD-101', name: '1. Chợ Bến Thành (Quận 1)', weight: 12, status: 'Pending' }
+        ];
+
+        function switchAuthMode(mode) {
+            const formLogin = document.getElementById('form-login');
+            const formRegister = document.getElementById('form-register');
+            const btnLogin = document.getElementById('btn-tab-login');
+            const btnRegister = document.getElementById('btn-tab-register');
+            const subtitle = document.getElementById('auth-subtitle');
+
+            if (mode === 'login') {
+                formLogin.classList.remove('hidden');
+                formRegister.classList.add('hidden');
+                btnLogin.className = "flex-1 py-2 text-xs font-semibold rounded-lg bg-emerald-600 text-white transition-all shadow";
+                btnRegister.className = "flex-1 py-2 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all";
+                subtitle.innerText = "Đăng nhập để bật GPS và nhận tuyến giao hàng";
+            } else {
+                formLogin.classList.add('hidden');
+                formRegister.classList.remove('hidden');
+                btnRegister.className = "flex-1 py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white transition-all shadow";
+                btnLogin.className = "flex-1 py-2 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all";
+                subtitle.innerText = "Tạo tài khoản mới để gia nhập đội ngũ Shipper";
+            }
+        }
+
+        async function readCloudKey(key) {
+            const res = await fetch(`${KVDB_BUCKET}/${encodeURIComponent(key)}?t=${Date.now()}`, { cache: "no-store" });
+            if (res.status === 404) return null;
+            if (!res.ok) throw new Error(`KVdb HTTP ${res.status}`);
+            const raw = await res.text();
+            if (!raw) return null;
+            try { return JSON.parse(raw); } catch (_) { return raw; }
+        }
+
+        async function writeCloudKey(key, value) {
+            const res = await fetch(`${KVDB_BUCKET}/${encodeURIComponent(key)}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(value)
+            });
+            if (!res.ok) throw new Error(`Không ghi được Cloud (HTTP ${res.status})`);
+            return true;
+        }
+
+        async function getRegisteredShipper(username) {
+            const current = await readCloudKey(REGISTER_PREFIX + username);
+            if (current) return current;
+            try {
+                const legacyRes = await fetch(`${KVDB_BUCKET}/elogistics_data?t=${Date.now()}`, { cache: "no-store" });
+                if (!legacyRes.ok) return null;
+                const raw = await legacyRes.text();
+                const legacy = raw ? JSON.parse(raw) : {};
+                return legacy?.registered_shippers?.[username] || null;
+            } catch (_) { return null; }
+        }
+
+        async function saveRegisteredShipper(username, profile) {
+            await writeCloudKey(REGISTER_PREFIX + username, profile);
+        }
+
+        async function saveOnlineStatus(username, isOnline, lat, lng) {
+            if (!username) return;
+            await writeCloudKey(ONLINE_PREFIX + username, {
+                username, isOnline,
+                lat: Number.isFinite(Number(lat)) ? Number(lat) : DEPOT.lat,
+                lng: Number.isFinite(Number(lng)) ? Number(lng) : DEPOT.lng,
+                lastUpdate: Date.now()
+            });
+        }
+
+        // ĐĂNG KÝ TÀI KHOẢN SHIPPER
+        async function handleShipperRegister(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btn-submit-register');
+            const fullname = document.getElementById('reg-fullname').value.trim();
+            const username = document.getElementById('reg-username').value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+            const phone = document.getElementById('reg-phone').value.trim();
+            const vehicle = document.getElementById('reg-vehicle').value;
+            const password = document.getElementById('reg-password').value.trim();
+
+            if (!username) {
+                alert('Tên đăng nhập chỉ dùng chữ cái không dấu và số (VD: shipper2)');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerText = "Đang lưu tài khoản lên Cloud...";
+
+            try {
+                const existing = await getRegisteredShipper(username);
+                if (existing) {
+                    alert('Tên đăng nhập này đã tồn tại! Vui lòng chọn tên khác.');
+                    return;
+                }
+                const profile = { username, password, fullname, phone, vehicle, createdAt: Date.now() };
+                await saveRegisteredShipper(username, profile);
+                await saveOnlineStatus(username, false, DEPOT.lat, DEPOT.lng);
+                alert(`Chúc mừng ${fullname} đã đăng ký thành công! Tài khoản đã được lưu lên Cloud.`);
+                document.getElementById('login-username').value = username;
+                document.getElementById('login-password').value = password;
+                switchAuthMode('login');
+            } catch (err) {
+                alert('Lỗi khi đăng ký: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Xác Nhận Đăng Ký Tài Khoản";
+            }
+        }
+
+        // ĐĂNG NHẬP SHIPPER
+        async function handleShipperLogin(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btn-submit-login');
+            const inputUser = document.getElementById('login-username').value.trim().toLowerCase();
+            const inputPass = document.getElementById('login-password').value.trim();
+
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Đang xác thực...`;
+
+            try {
+                const validUser = await getRegisteredShipper(inputUser);
+
+                if ((validUser && validUser.password === inputPass) || (inputUser === 'shipper' && inputPass === '123')) {
+                    currentUsername = inputUser;
+                    const displayName = validUser ? validUser.fullname : `Nguyễn Văn An (${inputUser.toUpperCase()})`;
+                    const displayVehicle = validUser ? `Phương tiện: ${validUser.vehicle}` : 'Phương tiện: Xe Máy (Honda Wave)';
+
+                    document.getElementById('shipper-name-display').innerText = displayName;
+                    document.getElementById('shipper-vehicle-display').innerText = displayVehicle;
+
+                    document.getElementById('shipper-auth-screen').classList.add('hidden');
+                    document.getElementById('shipper-app').classList.remove('hidden');
+
+                    renderTaskList();
+
+                    setTimeout(() => {
+                        initMap();
+                        startGPSWatcher();
+                    }, 100);
+                } else {
+                    alert('Tên đăng nhập hoặc mật khẩu không chính xác! (Tài khoản mặc định: shipper / mật khẩu: 123)');
+                }
+            } catch (err) {
+                alert('Lỗi kết nối: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fa-solid fa-location-crosshairs mr-1.5"></i> Đăng Nhập & Bật Định Vị GPS`;
+            }
+        }
+
+        function completeTask(taskId) {
+            const task = tasks.find(t => t.id === taskId);
+            if (task) {
+                task.status = 'Completed';
+                renderTaskList();
+                alert(`Đã xác nhận giao thành công đơn hàng ${taskId}!`);
+            }
+        }
+
+        function renderTaskList() {
+            const container = document.getElementById('shipper-task-list');
+            container.innerHTML = '';
+
+            tasks.forEach(t => {
+                const isDone = t.status === 'Completed';
+                const card = document.createElement('div');
+                card.className = "bg-slate-950 border border-slate-800 p-2.5 rounded-xl text-xs space-y-1";
+                
+                card.innerHTML = `
+                    <div class="flex justify-between font-bold text-slate-200">
+                        <span>${t.name}</span>
+                        <span class="${isDone ? 'text-emerald-400' : 'text-amber-400'} text-[10px] font-semibold">
+                            ${isDone ? '● Đã hoàn thành' : '● Đang giao'}
+                        </span>
+                    </div>
+                    <div class="text-[11px] text-slate-400">Mã đơn: ${t.id} | Khối lượng: ${t.weight} kg</div>
+                    ${isDone 
+                        ? `<button disabled class="w-full mt-2 bg-slate-800 text-emerald-400 border border-emerald-500/30 font-semibold py-1.5 rounded-lg text-[11px] cursor-not-allowed">
+                                <i class="fa-solid fa-circle-check mr-1"></i> Đã Giao Hàng Thành Công
+                           </button>`
+                        : `<button onclick="completeTask('${t.id}')" class="w-full mt-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-1.5 rounded-lg text-[11px] transition-all shadow">
+                                Xác nhận Đã Giao Hàng
+                           </button>`
+                    }
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // TẮT CA -> CẬP NHẬT OFFLINE LÊN CLOUD
+        async function handleShipperLogout() {
+            if (heartbeatTimer) clearInterval(heartbeatTimer);
+            if (watchGpsId) navigator.geolocation.clearWatch(watchGpsId);
+            if (currentUsername) {
+                await saveOnlineStatus(currentUsername, false, currentLat, currentLng);
+            }
+            location.reload();
+        }
+
+        function startGPSWatcher() {
+            saveOnlineStatus(currentUsername, true, currentLat, currentLng).catch(console.error);
+
+            heartbeatTimer = setInterval(() => {
+                if (currentUsername) {
+                    saveOnlineStatus(currentUsername, true, currentLat, currentLng).catch(console.error);
+                }
+            }, 10000);
+
+            if ("geolocation" in navigator) {
+                watchGpsId = navigator.geolocation.watchPosition(
+                    (position) => {
+                        currentLat = position.coords.latitude;
+                        currentLng = position.coords.longitude;
+                        const speed = Math.round((position.coords.speed || 0) * 3.6);
+
+                        document.getElementById('gps-coords-display').innerHTML = `<i class="fa-solid fa-crosshairs text-emerald-400"></i> GPS: ${currentLat.toFixed(4)}, ${currentLng.toFixed(4)}`;
+                        document.getElementById('gps-speed-display').innerText = `${speed} km/h`;
+
+
+                        if (map) {
+                            if (!userMarker) {
+                                const spIcon = L.divIcon({
+                                    className: 'custom-div-icon',
+                                    html: `<div class="w-9 h-9 rounded-full border-2 border-white bg-emerald-500 text-white flex items-center justify-center text-sm font-bold shadow-2xl animate-bounce"><i class="fa-solid fa-location-arrow"></i></div>`,
+                                    iconSize: [36, 36], iconAnchor: [18, 18]
+                                });
+                                userMarker = L.marker([currentLat, currentLng], { icon: spIcon }).addTo(map).bindPopup("<b>Vị trí thực tế của bạn</b>").openPopup();
+                            } else {
+                                userMarker.setLatLng([currentLat, currentLng]);
+                            }
+                            map.setView([currentLat, currentLng], 15);
+                        }
+                    },
+                    (error) => {
+                        document.getElementById('gps-coords-display').innerHTML = `<i class="fa-solid fa-crosshairs text-amber-400"></i> GPS: Dùng tọa độ mặc định (Chưa cấp quyền vị trí)`;
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+            }
+        }
+
+        document.addEventListener("visibilitychange", () => {
+            if (currentUsername && document.visibilityState === "visible") {
+                saveOnlineStatus(currentUsername, true, currentLat, currentLng).catch(console.error);
+            }
+        });
+
+        function initMap() {
+            if (map) return;
+            map = L.map('map', { zoomControl: false }).setView([DEPOT.lat, DEPOT.lng], 14);
+
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, TomTom, 2012',
+                maxZoom: 18
+            }).addTo(map);
+
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+            L.marker([DEPOT.lat, DEPOT.lng]).addTo(map).bindPopup("<b>" + DEPOT.name + "</b>");
+        }
+
+        function switchTab(tab) {
+            document.getElementById('panel-route').classList.add('hidden');
+            document.getElementById('panel-telematics').classList.add('hidden');
+            document.getElementById('tab-route').className = "flex-1 py-2.5 text-xs font-semibold text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1.5";
+            document.getElementById('tab-telematics').className = "flex-1 py-2.5 text-xs font-semibold text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1.5";
+
+            if(tab === 'my-route') {
+                document.getElementById('panel-route').classList.remove('hidden');
+                document.getElementById('tab-route').className = "flex-1 py-2.5 text-xs font-semibold text-emerald-400 border-b-2 border-emerald-500 flex items-center justify-center gap-1.5";
+            }
+            if(tab === 'telematics') {
+                document.getElementById('panel-telematics').classList.remove('hidden');
+                document.getElementById('tab-telematics').className = "flex-1 py-2.5 text-xs font-semibold text-emerald-400 border-b-2 border-emerald-500 flex items-center justify-center gap-1.5";
+            }
+        }
+    </script>
+</body>
+</html>
